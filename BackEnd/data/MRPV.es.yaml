@@ -1,0 +1,16 @@
+icao: MRPV
+nombre: "Tobías Bolaños (Pavas)"
+zona_horaria: America/Costa_Rica
+elevacion_ft: 3287
+pistas:
+  - id: "10/28"
+    longitud_m: 1566
+patron:
+  altitud_ft: 4700
+comunicaciones:
+  emergencia: "121.5"
+  superficie: "121.7"
+  torre: "118.3"
+  coco_aproximacion: "120.5"
+  coco_control: "119.6"
+  coco_radio: "126.8"

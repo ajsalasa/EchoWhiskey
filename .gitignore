@@ -1,0 +1,92 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors/IDE
+.vscode/
+.idea/
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Packaging
+build/
+dist/
+downloads/
+.eggs/
+*.egg-info/
+*.egg
+wheels/
+pip-wheel-metadata/
+
+# PyInstaller
+*.spec
+*.manifest
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.dmypy.json
+
+# Environments / Secrets
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+uvicorn*.log
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+generated_plugin_registrant.dart
+flutter_export_environment.sh
+
+# iOS (Flutter / Xcode)
+ios/Flutter/.last_build_id
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/Flutter.podspec
+ios/Flutter/Flutter.framework
+ios/Flutter/App.framework
+ios/.generated/
+ios/.symlinks/
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/profile
+ios/Shared.precompiled
+ios/*.mode1v3
+ios/*.mode2v3
+ios/*.moved-aside
+ios/*.pbxuser
+ios/*.perspectivev3
+ios/**/xcuserdata/
+ios/**/DerivedData/
+ios/**/build/

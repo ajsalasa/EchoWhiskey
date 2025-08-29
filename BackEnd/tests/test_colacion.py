@@ -69,3 +69,19 @@ def test_turn_solicitar_rodaje_falta_pista(monkeypatch):
     texto = "tobias superficie alfa bravo charlie solicito rodaje"
     out = main.turn(main.TurnIn(texto_alumno=texto, contexto=ctx))
     assert out.missing == ["pista"]
+
+
+def test_format_atc_number_runway():
+    assert main.format_atc_number("28") == "dos ocho"
+
+
+def test_format_atc_number_qnh():
+    assert main.format_atc_number("3006") == "tres cero cero seis"
+
+
+def test_format_atc_number_freq():
+    assert main.format_atc_number("118.3") == "uno uno ocho decimal tres"
+
+
+def test_format_atc_number_altitude():
+    assert main.format_atc_number(4700) == "cuatro mil setecientos"

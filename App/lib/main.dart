@@ -114,7 +114,7 @@ class TurnService {
     return TurnOutBody.fromJson(resp.data as Map<String, dynamic>);
   }
 
-  /// Pide audio neural (Polly) al backend /tts y devuelve bytes (mp3).
+  /// Pide audio neural (Polly) al backend /tts y devuelve bytes (WAV).
   Future<Uint8List> ttsNeural(String text,
       {String voiceId = 'Pedro', double rate = 0.88, int pitch = -6}) async {
     final resp = await _dio.post<List<int>>(
@@ -161,7 +161,7 @@ class _TurnScreenState extends State<TurnScreen> {
   }
 
   /// Guarda bytes en archivo temporal y devuelve la ruta.
-  Future<String> _writeTempAudio(Uint8List bytes, {String ext = 'mp3'}) async {
+  Future<String> _writeTempAudio(Uint8List bytes, {String ext = 'wav'}) async {
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/ecowhisky_tts_${DateTime.now().microsecondsSinceEpoch}.$ext';
@@ -193,8 +193,8 @@ class _TurnScreenState extends State<TurnScreen> {
       });
 
       if (_atc.isNotEmpty) {
-        final bytes = await service.ttsNeural(_atc); // voz neural (mp3)
-        final path = await _writeTempAudio(bytes, ext: 'mp3');
+        final bytes = await service.ttsNeural(_atc); // voz neural (wav)
+        final path = await _writeTempAudio(bytes, ext: 'wav');
         await player.stop();
         setState(() => _isPlaying = true);
         await player.play(DeviceFileSource(path)); // ← iOS: desde archivo

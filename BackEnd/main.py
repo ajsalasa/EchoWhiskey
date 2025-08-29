@@ -351,16 +351,28 @@ class TtsIn(BaseModel):
     text: str
     voice_id: Optional[str] = None
     rate: Optional[float] = 0.90   # 0.5–1.5 -> 60–140%
+    pitch: Optional[int] = 0       # variación en %, 0 = sin cambio
 
-def build_polly_ssml(text: str, rate: float = 0.90) -> str:
-    # Para Neural, usa solo 'rate' (pitch a veces da InvalidSsml). 90% ≈ ATC sobrio.
+def build_polly_ssml(text: str, rate: float = 0.90, pitch: int = 0) -> str:
+    """Construye SSML para Polly Neural.
+
+    Solo se modifica *rate* y opcionalmente *pitch*. El parámetro de tono se
+    expresa como porcentaje (+/-) para evitar valores inválidos.
+    """
     rate_pct = max(60, min(140, int(round(rate * 100))))
-    if rate_pct == 100:
+    pitch_val = max(-50, min(50, int(pitch)))  # limita variaciones extremas
+    if rate_pct == 100 and pitch_val == 0:
         return f'<speak>{escape(text)}</speak>'
-    return f'<speak><prosody rate="{rate_pct}%">{escape(text)}</prosody></speak>'
+    attrs = []
+    if rate_pct != 100:
+        attrs.append(f'rate="{rate_pct}%"')
+    if pitch_val != 0:
+        attrs.append(f'pitch="{pitch_val}%"')
+    attr_str = " ".join(attrs)
+    return f'<speak><prosody {attr_str}>{escape(text)}</prosody></speak>'
 
-def synthesize_pcm16_neural(text: str, voice_id: str, rate: float) -> np.ndarray:
-    ssml = build_polly_ssml(text, rate=rate)
+def synthesize_pcm16_neural(text: str, voice_id: str, rate: float, pitch: int = 0) -> np.ndarray:
+    ssml = build_polly_ssml(text, rate=rate, pitch=pitch)
     resp = polly.synthesize_speech(
         TextType="ssml", Text=ssml, VoiceId=voice_id,
         Engine="neural", OutputFormat="pcm", SampleRate="16000",
@@ -403,9 +415,14 @@ def to_wav_bytes(x: np.ndarray, sr=16000) -> bytes:
 
 @app.post("/tts")
 def tts_fx(in_: TtsIn):
+    """Genera audio WAV (16 kHz) con efecto de radio.
+
+    La salida se entrega como ``audio/wav``; para MP3 se requeriría codificación
+    adicional.
+    """
     voice = in_.voice_id or POLLY_VOICE
     try:
-        x = synthesize_pcm16_neural(in_.text, voice, in_.rate or 0.9)
+        x = synthesize_pcm16_neural(in_.text, voice, in_.rate or 0.9, in_.pitch or 0)
     except ClientError as e:
         return Response(status_code=502, content=str(e).encode("utf-8"), media_type="text/plain")
     except Exception as e:

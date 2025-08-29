@@ -62,7 +62,7 @@ AIRPORT = load_airport("MRPV")
 TEMPLATES = {
     "superficie": {
         "falta_dato": "¿{faltante}? {indicativo} confirme.",
-        "rodaje": "{indicativo} recibido, pista en uso {pista}, ruede {ruta} al punto de espera pista {pista}, QNH {qnh}, mantenga posición corta.",
+        "rodaje": "{indicativo} recibido, pista en uso {pista}, ruede {ruta} al punto de espera pista {pista}, mantenga posición corta.",
         "ack": "{indicativo} recibido."
     },
     "torre": {
@@ -244,7 +244,7 @@ def atc_phrase(ctx: Contexto, slots: Dict[str, Optional[str]], intent: str, miss
 
     if fase == "superficie":
         if intent in ("abrir_plan", "solicitar_rodaje"):
-            return TEMPLATES["superficie"]["rodaje"].format(indicativo=indicativo, pista=pista, ruta="A2-A", qnh=qnh)
+            return TEMPLATES["superficie"]["rodaje"].format(indicativo=indicativo, pista=pista, ruta="A2-A")
         return TEMPLATES["superficie"]["ack"].format(indicativo=indicativo)
 
     if fase == "torre":
@@ -271,9 +271,12 @@ def atc_phrase(ctx: Contexto, slots: Dict[str, Optional[str]], intent: str, miss
     return f"{indicativo} recibido."
 
 def required_slots_for(fase: str, intent: str) -> List[str]:
-    if fase == "superficie" and intent in ("abrir_plan", "solicitar_rodaje"): return ["indicativo", "pista", "qnh"]
-    if fase == "torre" and intent == "listo_despegue": return ["indicativo", "pista"]
-    if fase == "coco_app" and intent == "ingresando_zona": return ["indicativo", "zona", "nivel_ft"]
+    if fase == "superficie" and intent in ("abrir_plan", "solicitar_rodaje"):
+        return ["indicativo", "pista"]
+    if fase == "torre" and intent == "listo_despegue":
+        return ["indicativo", "pista"]
+    if fase == "coco_app" and intent == "ingresando_zona":
+        return ["indicativo", "zona", "nivel_ft"]
     return ["indicativo"]
 
 # ---------- Endpoints ----------

@@ -142,11 +142,6 @@ class _TurnScreenState extends State<TurnScreen> {
   late final TurnService service;
   final AudioPlayer player = AudioPlayer();
   late final SpeechService _speech;
-
-  final TextEditingController _input = TextEditingController(
-    text: 'Pavas torre, alfa noviembre india listo para el despegue pista uno cero',
-  );
-
   String _fase = 'torre';
   String _atc = '';
   String _feedback = '';
@@ -154,6 +149,7 @@ class _TurnScreenState extends State<TurnScreen> {
   int? _vientoVel = 12;
   String? _qnh = '3003';
   bool _isPlaying = false;
+  String _recognized = '';
 
   @override
   void initState() {
@@ -163,9 +159,7 @@ class _TurnScreenState extends State<TurnScreen> {
     _speech = SpeechService();
     _speech.recognized.addListener(() {
       setState(() {
-        _input.text = _speech.recognized.value;
-        _input.selection = TextSelection.fromPosition(
-            TextPosition(offset: _input.text.length));
+        _recognized = _speech.recognized.value;
       });
     });
     _speech.error.addListener(() {
@@ -186,7 +180,7 @@ class _TurnScreenState extends State<TurnScreen> {
     return path;
   }
 
-  Future<void> _send() async {
+  Future<void> _send(String texto) async {
     setState(() {
       _atc = '';
       _feedback = '';
@@ -194,7 +188,7 @@ class _TurnScreenState extends State<TurnScreen> {
     try {
       final out = await service.turn(
         TurnInBody(
-          textoAlumno: _input.text,
+          textoAlumno: texto,
           contexto: Contexto(
             fase: _fase,
             qnh: _qnh,
@@ -220,9 +214,19 @@ class _TurnScreenState extends State<TurnScreen> {
     }
   }
 
+  Future<void> _stopAndSend() async {
+    await _speech.stop();
+    final text = _recognized.trim();
+    setState(() {
+      _recognized = '';
+    });
+    if (text.isNotEmpty) {
+      await _send(text);
+    }
+  }
+
   @override
   void dispose() {
-    _input.dispose();
     player.dispose();
     _speech.dispose();
     super.dispose();
@@ -230,115 +234,39 @@ class _TurnScreenState extends State<TurnScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fases = const ['superficie', 'torre', 'coco_app', 'coco_control', 'coco_radio'];
-
     return Scaffold(
       appBar: AppBar(title: const Text('EcoWhisky ATC — iOS')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
-            children: [
-              const Text('Fase: '),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: _fase,
-                items: fases.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                onChanged: (v) => setState(() => _fase = v ?? 'torre'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _input,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Frase del alumno',
-                    border: OutlineInputBorder(),
-                  ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTapDown: _isPlaying ? null : (_) => _speech.start(),
+              onTapUp: _isPlaying ? null : (_) => _stopAndSend(),
+              onTapCancel: _isPlaying ? null : _stopAndSend,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.mic, size: 60, color: Colors.white),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTapDown: (_) => _speech.start(),
-                onTapUp: (_) => _speech.stop(),
-                onTapCancel: _speech.stop,
-                child: const Padding(
-                  padding: EdgeInsets.only(top: 8.0),
-                  child: Icon(Icons.mic),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: TextEditingController(text: _vientoDir?.toString() ?? ''),
-                  decoration: const InputDecoration(
-                    labelText: 'Viento dir (°)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) => _vientoDir = int.tryParse(v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: TextEditingController(text: _vientoVel?.toString() ?? ''),
-                  decoration: const InputDecoration(
-                    labelText: 'Viento vel (kt)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) => _vientoVel = int.tryParse(v),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: TextEditingController(text: _qnh ?? ''),
-            decoration: const InputDecoration(
-              labelText: 'QNH (pulgadas, ej 3003)',
-              border: OutlineInputBorder(),
             ),
-            keyboardType: TextInputType.number,
-            onChanged: (v) => _qnh = v.isEmpty ? null : v,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _isPlaying ? null : _send,
-            icon: const Icon(Icons.send),
-            label: const Text('Enviar'),
-          ),
-          const SizedBox(height: 16),
-          Text('ATC:', style: Theme.of(context).textTheme.titleMedium),
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(top: 8, bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 24),
+            Text('Feedback:', style: Theme.of(context).textTheme.titleMedium),
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(_feedback),
             ),
-            child: Text(_atc),
-          ),
-          Text('Feedback:', style: Theme.of(context).textTheme.titleMedium),
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(_feedback),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import 'speech_service.dart';
 
 void main() {
   runApp(const EcoWhiskyApp());
@@ -140,6 +141,7 @@ class TurnScreen extends StatefulWidget {
 class _TurnScreenState extends State<TurnScreen> {
   late final TurnService service;
   final AudioPlayer player = AudioPlayer();
+  late final SpeechService _speech;
 
   final TextEditingController _input = TextEditingController(
     text: 'Pavas torre, alfa noviembre india listo para el despegue pista uno cero',
@@ -158,6 +160,20 @@ class _TurnScreenState extends State<TurnScreen> {
     super.initState();
     service = TurnService.standard();
     player.onPlayerComplete.listen((_) => setState(() => _isPlaying = false));
+    _speech = SpeechService();
+    _speech.recognized.addListener(() {
+      setState(() {
+        _input.text = _speech.recognized.value;
+        _input.selection = TextSelection.fromPosition(
+            TextPosition(offset: _input.text.length));
+      });
+    });
+    _speech.error.addListener(() {
+      final err = _speech.error.value;
+      if (err != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
+    });
   }
 
   /// Guarda bytes en archivo temporal y devuelve la ruta.
@@ -208,6 +224,7 @@ class _TurnScreenState extends State<TurnScreen> {
   void dispose() {
     _input.dispose();
     player.dispose();
+    _speech.dispose();
     super.dispose();
   }
 
@@ -232,14 +249,31 @@ class _TurnScreenState extends State<TurnScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _input,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Frase del alumno',
-              border: OutlineInputBorder(),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _input,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Frase del alumno',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTapDown: (_) => _speech.start(),
+                onTapUp: (_) => _speech.stop(),
+                onTapCancel: _speech.stop,
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
+                  child: Icon(Icons.mic),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(

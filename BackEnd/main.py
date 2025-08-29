@@ -413,7 +413,3 @@ def tts_fx(in_: TtsIn):
     x = bp_filter(x); x = comp_soft(x); x = add_hiss(x); x = np.concatenate([x, squelch_tail()], axis=0)
     wav = to_wav_bytes(x)
     return Response(content=wav, media_type="audio/wav")
-
-@app.get("/health")
-def health():
-    return {"ok": True, "airport": AIRPORT.get("icao", "MRPV")}

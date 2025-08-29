@@ -11,7 +11,7 @@
 
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
-from typing import List, Dict, Optional, Literal,Union
+from typing import List, Dict, Optional, Literal, Union
 import re, yaml, os, io, json, random
 import numpy as np
 import boto3
@@ -123,6 +123,61 @@ def extract_qnh(s: str) -> Optional[str]:
     if "tres cero cero cinco" in s: return "3005"
     if "tres cero cero seis" in s: return "3006"
     return None
+
+# ---------- Formateo numérico ATC ----------
+_DIGITS_ES = {
+    "0": "cero", "1": "uno", "2": "dos", "3": "tres", "4": "cuatro",
+    "5": "cinco", "6": "seis", "7": "siete", "8": "ocho", "9": "nueve"
+}
+
+def _digits_individuales(s: str) -> str:
+    return " ".join(_DIGITS_ES[c] for c in s)
+
+def _spanish_number(n: int) -> str:
+    """Convierte 0-9999 a español estándar."""
+    unidades = ["cero","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve"]
+    especiales = {10:"diez",11:"once",12:"doce",13:"trece",14:"catorce",15:"quince"}
+    decenas = {20:"veinte",30:"treinta",40:"cuarenta",50:"cincuenta",60:"sesenta",70:"setenta",80:"ochenta",90:"noventa"}
+    centenas = {100:"cien",200:"doscientos",300:"trescientos",400:"cuatrocientos",500:"quinientos",600:"seiscientos",700:"setecientos",800:"ochocientos",900:"novecientos"}
+    def _1_99(n: int) -> str:
+        if n < 10: return unidades[n]
+        if n in especiales: return especiales[n]
+        if 16 <= n <= 19: return "dieci" + unidades[n-10]
+        if n == 20: return "veinte"
+        if 21 <= n <= 29: return "veinte y " + unidades[n-20]
+        d = (n//10)*10
+        u = n % 10
+        if u == 0: return decenas[d]
+        return f"{decenas[d]} y {unidades[u]}"
+    def _1_999(n: int) -> str:
+        if n < 100: return _1_99(n)
+        if n % 100 == 0: return centenas[n]
+        c = (n//100)*100
+        return f"{centenas[c]} {_1_99(n%100)}"
+    if n < 1000: return _1_999(n)
+    mil = n // 1000
+    resto = n % 1000
+    pref = "mil" if mil == 1 else f"{_1_999(mil)} mil"
+    if resto == 0: return pref
+    return f"{pref} {_1_999(resto)}"
+
+def format_atc_number(val: Union[int, str]) -> str:
+    """Formatea números con fraseo ATC en español.
+
+    Reglas:
+    - Pistas y QNH → dígitos individuales ("28" → "dos ocho"; "3006" → "tres cero cero seis").
+    - Frecuencias → dígitos separados con "decimal" ("118.3" → "uno uno ocho decimal tres").
+    - Altitudes → miles/cientos en palabras (4700 → "cuatro mil setecientos").
+    """
+    if isinstance(val, int):
+        return _spanish_number(val)
+    s = str(val).strip()
+    if re.fullmatch(r"\d+\.\d+", s):
+        entero, frac = s.split(".")
+        return f"{_digits_individuales(entero)} decimal {_digits_individuales(frac)}"
+    if s.isdigit():
+        return _digits_individuales(s)
+    return s
 
 # ---------- Modelos ----------
 class Contexto(BaseModel):
@@ -238,13 +293,15 @@ def atc_phrase(ctx: Contexto, slots: Dict[str, Optional[str]], intent: str, miss
     viento_dir = ctx.viento_dir or 80
     viento_vel = ctx.viento_vel or 12
     pista = ctx.runway_actual or slots.get("pista") or choose_runway_from_wind(ctx.viento_dir)
+    pista_fmt = format_atc_number(pista)
+    qnh_fmt = format_atc_number(qnh)
 
     if missing:
         return TEMPLATES[fase]["falta_dato"].format(faltante=" / ".join(missing), indicativo=indicativo)
 
     if fase == "superficie":
         if intent in ("abrir_plan", "solicitar_rodaje"):
-            return TEMPLATES["superficie"]["rodaje"].format(indicativo=indicativo, pista=pista, ruta="A2-A")
+            return TEMPLATES["superficie"]["rodaje"].format(indicativo=indicativo, pista=pista_fmt, ruta="A2-A")
         return TEMPLATES["superficie"]["ack"].format(indicativo=indicativo)
 
     if fase == "torre":
@@ -252,18 +309,21 @@ def atc_phrase(ctx: Contexto, slots: Dict[str, Optional[str]], intent: str, miss
             instr = "rumbo de pista y notifique alcanzando cinco mil pies"
             return TEMPLATES["torre"]["despegue_autorizado"].format(
                 indicativo=indicativo, viento_dir=viento_dir, viento_vel=viento_vel,
-                pista=pista, instruccion_post=instr
+                pista=pista_fmt, instruccion_post=instr
             )
         if intent == "reportar_altitud":
+            freq = AIRPORT["comunicaciones"]["coco_aproximacion"]
             return TEMPLATES["torre"]["transferir_coco_app"].format(
-                indicativo=indicativo, frecuencia=AIRPORT["comunicaciones"]["coco_aproximacion"]
+                indicativo=indicativo, frecuencia=format_atc_number(freq)
             )
-        return TEMPLATES["torre"]["line_up_wait"].format(indicativo=indicativo, pista=pista)
+        return TEMPLATES["torre"]["line_up_wait"].format(indicativo=indicativo, pista=pista_fmt)
 
     if fase == "coco_app":
         nivel = slots.get("nivel_ft") or 7000
         zona = slots.get("zona") or "ECO"
-        return TEMPLATES["coco_app"]["ack"].format(indicativo=indicativo, nivel_ft=nivel, qnh=qnh, zona=zona)
+        return TEMPLATES["coco_app"]["ack"].format(
+            indicativo=indicativo, nivel_ft=format_atc_number(nivel), qnh=qnh_fmt, zona=zona
+        )
 
     if fase == "coco_radio":
         return TEMPLATES["coco_radio"]["ack"].format(indicativo=indicativo, minutos=30)
@@ -415,8 +475,9 @@ def tts_fx(in_: TtsIn):
     adicional.
     """
     voice = in_.voice_id or POLLY_VOICE
+    texto = re.sub(r"\d+(?:\.\d+)?", lambda m: format_atc_number(m.group(0)), in_.text)
     try:
-        x = synthesize_pcm16_neural(in_.text, voice, in_.rate or 0.9, in_.pitch or 0)
+        x = synthesize_pcm16_neural(texto, voice, in_.rate or 0.9, in_.pitch or 0)
     except ClientError as e:
         return Response(status_code=502, content=str(e).encode("utf-8"), media_type="text/plain")
     except Exception as e:

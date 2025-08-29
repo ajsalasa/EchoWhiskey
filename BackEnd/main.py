@@ -137,15 +137,6 @@ class TurnIn(BaseModel):
     texto_alumno: str
     contexto: Contexto
 
-class TurnOut(BaseModel):
-    intent: str
-    slots: Dict[str, Optional[str]]
-    missing: List[str]
-    feedback_micro: str
-    atc: str
-    fase: str
-    env: Dict[str, Optional[str]]  # añadido: qnh/viento usados
-
 class EnvOut(BaseModel):
     qnh: Optional[str] = None
     viento_dir: Optional[int] = None
